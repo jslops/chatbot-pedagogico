@@ -1,0 +1,926 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chatbot Senac - IA Hugging Face</title>
+    <style>
+        :root {
+            --primary-color: #0066cc;
+            --background-color: #f5f5f5;
+            --chat-background: #ffffff;
+            --user-message-bg: #0066cc;
+            --user-message-text: #ffffff;
+            --bot-message-bg: #f0f0f0;
+            --bot-message-text: #333333;
+            --border-radius: 12px;
+            --shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            --error-color: #e74c3c;
+            --warning-color: #f39c12;
+            --success-color: #2ecc71;
+        }
+
+        [data-theme="dark"] {
+            --primary-color: #4dabf7;
+            --background-color: #1a1a1a;
+            --chat-background: #2d2d2d;
+            --user-message-bg: #4dabf7;
+            --user-message-text: #ffffff;
+            --bot-message-bg: #3d3d3d;
+            --bot-message-text: #e0e0e0;
+            --shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: var(--background-color);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            transition: background-color 0.3s;
+        }
+
+        .header {
+            background-color: var(--chat-background);
+            padding: 15px 20px;
+            box-shadow: var(--shadow);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            z-index: 10;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+        }
+
+        .logo {
+            height: 40px;
+            margin-right: 15px;
+        }
+
+        .title {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--bot-message-text);
+        }
+
+        .header-controls {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .theme-toggle {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 20px;
+            color: var(--bot-message-text);
+        }
+
+        .model-selector {
+            padding: 6px 10px;
+            border-radius: 6px;
+            border: 1px solid #ddd;
+            background-color: var(--chat-background);
+            color: var(--bot-message-text);
+        }
+
+        .chat-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            max-width: 900px;
+            margin: 0 auto;
+            width: 100%;
+            height: calc(100vh - 130px);
+        }
+
+        .messages-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .message {
+            max-width: 80%;
+            padding: 12px 16px;
+            border-radius: var(--border-radius);
+            line-height: 1.5;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .user-message {
+            align-self: flex-end;
+            background-color: var(--user-message-bg);
+            color: var(--user-message-text);
+            border-bottom-right-radius: 4px;
+        }
+
+        .bot-message {
+            align-self: flex-start;
+            background-color: var(--bot-message-bg);
+            color: var(--bot-message-text);
+            border-bottom-left-radius: 4px;
+        }
+
+        .error-message {
+            align-self: flex-start;
+            background-color: var(--error-color);
+            color: white;
+            border-bottom-left-radius: 4px;
+        }
+
+        .message-image {
+            max-width: 100%;
+            border-radius: 8px;
+            margin-top: 8px;
+            cursor: pointer;
+        }
+
+        .input-container {
+            padding: 20px;
+            background-color: var(--chat-background);
+            border-top: 1px solid #e0e0e0;
+            display: flex;
+            gap: 10px;
+        }
+
+        .input-field {
+            flex: 1;
+            padding: 12px 16px;
+            border: 1px solid #ddd;
+            border-radius: 24px;
+            outline: none;
+            font-size: 16px;
+            transition: border-color 0.3s;
+            background-color: var(--chat-background);
+            color: var(--bot-message-text);
+        }
+
+        .input-field:focus {
+            border-color: var(--primary-color);
+        }
+
+        .send-button {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 44px;
+            height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .send-button:hover {
+            background-color: #0052a3;
+        }
+
+        .send-button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+
+        .typing-indicator {
+            display: none;
+            align-self: flex-start;
+            background-color: var(--bot-message-bg);
+            color: var(--bot-message-text);
+            padding: 12px 16px;
+            border-radius: var(--border-radius);
+            border-bottom-left-radius: 4px;
+        }
+
+        .typing-dots {
+            display: flex;
+            gap: 4px;
+        }
+
+        .typing-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: #999;
+            animation: typing 1.4s infinite ease-in-out;
+        }
+
+        .typing-dot:nth-child(1) { animation-delay: 0s; }
+        .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+        .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+        @keyframes typing {
+            0%, 60%, 100% { transform: translateY(0); }
+            30% { transform: translateY(-5px); }
+        }
+
+        .tab-container {
+            display: flex;
+            padding: 0 20px;
+            background-color: var(--chat-background);
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.3s;
+            color: var(--bot-message-text);
+        }
+
+        .tab.active {
+            border-bottom: 2px solid var(--primary-color);
+            color: var(--primary-color);
+        }
+
+        .tab.disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .image-preview {
+            max-width: 200px;
+            max-height: 200px;
+            border-radius: 8px;
+            margin-top: 10px;
+        }
+
+        .upload-container {
+            padding: 10px 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .upload-label {
+            display: inline-block;
+            padding: 8px 16px;
+            background-color: var(--primary-color);
+            color: white;
+            border-radius: 4px;
+            cursor: pointer;
+            text-align: center;
+        }
+
+        .upload-input {
+            display: none;
+        }
+
+        .privacy-notice {
+            padding: 10px 20px;
+            font-size: 12px;
+            color: #777;
+            text-align: center;
+            background-color: var(--chat-background);
+            border-top: 1px solid #e0e0e0;
+        }
+
+        .debug-info {
+            font-size: 10px;
+            opacity: 0.7;
+            margin-top: 5px;
+        }
+
+        .clear-button {
+            background: none;
+            border: none;
+            color: var(--bot-message-text);
+            cursor: pointer;
+            font-size: 14px;
+            padding: 5px 10px;
+            border-radius: 4px;
+            transition: background-color 0.3s;
+        }
+
+        .clear-button:hover {
+            background-color: rgba(0,0,0,0.1);
+        }
+
+        /* Responsividade */
+        @media (max-width: 768px) {
+            .message {
+                max-width: 90%;
+            }
+            
+            .chat-container {
+                height: calc(100vh - 120px);
+            }
+
+            .header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 10px;
+            }
+
+            .header-controls {
+                width: 100%;
+                justify-content: space-between;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-left">
+            <div class="title">Chatbot Senac - IA Hugging Face</div>
+        </div>
+        <div class="header-controls">
+            <select class="model-selector" id="modelSelector">
+                <option value="microsoft/DialoGPT-medium">DialoGPT (Chat)</option>
+                <option value="microsoft/DialoGPT-large">DialoGPT Large</option>
+                <option value="facebook/blenderbot-400M-distill">BlenderBot</option>
+                <option value="stabilityai/stable-diffusion-2-1">Stable Diffusion (Imagens)</option>
+            </select>
+            <button class="clear-button" id="clearButton">Limpar Chat</button>
+            <button class="theme-toggle" id="themeToggle">🌙</button>
+        </div>
+    </div>
+    
+    <div class="tab-container">
+        <div class="tab active" id="textTab">Chat de Texto</div>
+        <div class="tab" id="imageTab">Gerar Imagem</div>
+        <div class="tab" id="editTab">Editar Imagem</div>
+    </div>
+    
+    <div class="chat-container">
+        <div class="messages-container" id="messagesContainer">
+            <div class="message bot-message">
+                Olá! Sou o assistente virtual do Senac com IA. Posso ajudar com informações sobre os cursos administrativo, vendas e supermercado, ou conversar sobre outros assuntos usando modelos de IA. Como posso ajudá-lo hoje?
+            </div>
+        </div>
+        
+        <div class="typing-indicator" id="typingIndicator">
+            <div class="typing-dots">
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+            </div>
+        </div>
+        
+        <div class="upload-container" id="uploadContainer" style="display: none;">
+            <label for="imageUpload" class="upload-label">Escolher Imagem</label>
+            <input type="file" id="imageUpload" class="upload-input" accept="image/*">
+            <div id="imagePreview"></div>
+        </div>
+        
+        <div class="input-container">
+            <input type="text" class="input-field" id="userInput" placeholder="Digite sua mensagem..." autocomplete="off">
+            <button class="send-button" id="sendButton">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M22 2L11 13" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M22 2L15 22L11 13L2 9L22 2Z" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </button>
+        </div>
+        
+        <div class="privacy-notice">
+            Nota: Suas mensagens podem ser processadas por serviços externos. Evite compartilhar informações sensíveis.
+        </div>
+    </div>
+
+    <script>
+        // CONFIGURAÇÕES - CHAVE DA API INSERIDA
+        const HF_API_KEY = "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";
+        const USE_PROXY = false;
+        const PROXY_URL = "https://your-proxy-domain.com/api/inference";
+        
+        // Modelos padrão
+        const DEFAULT_MODEL_TEXT = "microsoft/DialoGPT-medium";
+        const DEFAULT_MODEL_IMAGE = "stabilityai/stable-diffusion-2-1";
+        
+        // Configuração de cache
+        const ENABLE_CACHE = true;
+        const CACHE_KEY = "senac_chat_history";
+        
+        // Elementos da interface
+        const messagesContainer = document.getElementById('messagesContainer');
+        const userInput = document.getElementById('userInput');
+        const sendButton = document.getElementById('sendButton');
+        const typingIndicator = document.getElementById('typingIndicator');
+        const modelSelector = document.getElementById('modelSelector');
+        const themeToggle = document.getElementById('themeToggle');
+        const clearButton = document.getElementById('clearButton');
+        const textTab = document.getElementById('textTab');
+        const imageTab = document.getElementById('imageTab');
+        const editTab = document.getElementById('editTab');
+        const uploadContainer = document.getElementById('uploadContainer');
+        const imageUpload = document.getElementById('imageUpload');
+        const imagePreview = document.getElementById('imagePreview');
+        
+        // Estado da aplicação
+        let currentTab = 'text';
+        let conversationHistory = [];
+        let uploadedImage = null;
+        
+        // Inicialização
+        function init() {
+            loadConversationHistory();
+            setupEventListeners();
+            updateTabUI();
+            
+            // Verificar se a chave da API está configurada
+            if (HF_API_KEY && HF_API_KEY !== "YOUR_HF_API_KEY") {
+                addMessage(
+                    "✅ Chave da API Hugging Face configurada com sucesso! Todas as funcionalidades estão disponíveis.",
+                    false
+                );
+            }
+        }
+        
+        // Configurar event listeners
+        function setupEventListeners() {
+            sendButton.addEventListener('click', sendMessage);
+            
+            userInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    sendMessage();
+                }
+            });
+            
+            modelSelector.addEventListener('change', () => {
+                updateTabUI();
+            });
+            
+            themeToggle.addEventListener('click', toggleTheme);
+            clearButton.addEventListener('click', clearConversationHistory);
+            
+            textTab.addEventListener('click', () => switchTab('text'));
+            imageTab.addEventListener('click', () => {
+                if (!imageTab.classList.contains('disabled')) {
+                    switchTab('image');
+                }
+            });
+            editTab.addEventListener('click', () => {
+                if (!editTab.classList.contains('disabled')) {
+                    switchTab('edit');
+                }
+            });
+            
+            imageUpload.addEventListener('change', handleImageUpload);
+            
+            // Focar no campo de entrada ao carregar a página
+            userInput.focus();
+        }
+        
+        // Alternar entre abas
+        function switchTab(tab) {
+            currentTab = tab;
+            updateTabUI();
+            
+            // Atualizar placeholder baseado na aba
+            if (tab === 'text') {
+                userInput.placeholder = "Digite sua mensagem...";
+                uploadContainer.style.display = 'none';
+            } else if (tab === 'image') {
+                userInput.placeholder = "Descreva a imagem que deseja gerar...";
+                uploadContainer.style.display = 'none';
+            } else if (tab === 'edit') {
+                userInput.placeholder = "Descreva as alterações na imagem...";
+                uploadContainer.style.display = 'block';
+            }
+        }
+        
+        // Atualizar UI da aba
+        function updateTabUI() {
+            // Atualizar estado das abas
+            textTab.classList.toggle('active', currentTab === 'text');
+            imageTab.classList.toggle('active', currentTab === 'image');
+            editTab.classList.toggle('active', currentTab === 'edit');
+            
+            // Verificar se o modelo selecionado suporta geração de imagens
+            const selectedModel = modelSelector.value;
+            const isImageModel = selectedModel.includes('stable-diffusion') || selectedModel.includes('dall-e');
+            
+            if (isImageModel) {
+                imageTab.classList.remove('disabled');
+                editTab.classList.remove('disabled');
+            } else {
+                if (currentTab !== 'text') switchTab('text');
+                imageTab.classList.add('disabled');
+                editTab.classList.add('disabled');
+            }
+        }
+        
+        // Alternar tema claro/escuro
+        function toggleTheme() {
+            const currentTheme = document.body.getAttribute('data-theme');
+            if (currentTheme === 'dark') {
+                document.body.removeAttribute('data-theme');
+                themeToggle.textContent = '🌙';
+                localStorage.setItem('theme', 'light');
+            } else {
+                document.body.setAttribute('data-theme', 'dark');
+                themeToggle.textContent = '☀️';
+                localStorage.setItem('theme', 'dark');
+            }
+        }
+        
+        // Carregar tema salvo
+        function loadTheme() {
+            const savedTheme = localStorage.getItem('theme');
+            if (savedTheme === 'dark') {
+                document.body.setAttribute('data-theme', 'dark');
+                themeToggle.textContent = '☀️';
+            }
+        }
+        
+        // Adicionar mensagem ao chat
+        function addMessage(text, isUser = false, type = "normal", imageUrl = null, debugInfo = null) {
+            const messageElement = document.createElement('div');
+            
+            if (type === "error") {
+                messageElement.classList.add('message', 'error-message');
+            } else {
+                messageElement.classList.add('message');
+                messageElement.classList.add(isUser ? 'user-message' : 'bot-message');
+            }
+            
+            messageElement.textContent = text;
+            
+            // Adicionar imagem se fornecida
+            if (imageUrl) {
+                const img = document.createElement('img');
+                img.src = imageUrl;
+                img.classList.add('message-image');
+                img.onclick = () => window.open(imageUrl, '_blank');
+                messageElement.appendChild(img);
+            }
+            
+            // Adicionar informações de debug se fornecidas
+            if (debugInfo && localStorage.getItem('debugMode') === 'true') {
+                const debugElement = document.createElement('div');
+                debugElement.classList.add('debug-info');
+                debugElement.textContent = debugInfo;
+                messageElement.appendChild(debugElement);
+            }
+            
+            messagesContainer.appendChild(messageElement);
+            scrollToBottom();
+            
+            // Salvar no histórico
+            if (type !== "error") {
+                conversationHistory.push({
+                    text,
+                    isUser,
+                    timestamp: new Date().toISOString(),
+                    type,
+                    imageUrl
+                });
+                saveConversationHistory();
+            }
+        }
+        
+        // Rolar para o final do chat
+        function scrollToBottom() {
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+        
+        // Mostrar indicador de digitação
+        function showTypingIndicator() {
+            typingIndicator.style.display = 'block';
+            scrollToBottom();
+        }
+        
+        // Esconder indicador de digitação
+        function hideTypingIndicator() {
+            typingIndicator.style.display = 'none';
+        }
+        
+        // Enviar mensagem
+        function sendMessage() {
+            const message = userInput.value.trim();
+            if (message === '') return;
+            
+            // Adicionar mensagem do usuário
+            addMessage(message, true);
+            userInput.value = '';
+            
+            // Processar baseado na aba atual
+            if (currentTab === 'text') {
+                processTextMessage(message);
+            } else if (currentTab === 'image') {
+                generateImage(message);
+            } else if (currentTab === 'edit' && uploadedImage) {
+                editImage(message, uploadedImage);
+            } else if (currentTab === 'edit') {
+                addMessage("Por favor, faça upload de uma imagem primeiro.", false, "error");
+            }
+        }
+        
+        // Processar mensagem de texto
+        async function processTextMessage(message) {
+            showTypingIndicator();
+            
+            try {
+                const model = modelSelector.value;
+                const response = await queryHuggingFaceAPI({
+                    inputs: message,
+                    model: model
+                });
+                
+                hideTypingIndicator();
+                
+                if (response && response.generated_text) {
+                    addMessage(response.generated_text);
+                } else {
+                    addMessage("Desculpe, não consegui processar sua solicitação. Tente novamente.", false, "error");
+                }
+            } catch (error) {
+                hideTypingIndicator();
+                console.error("Erro ao processar mensagem:", error);
+                
+                // Fallback para base de conhecimento local se a API falhar
+                const fallbackResponse = getFallbackResponse(message);
+                addMessage(fallbackResponse);
+            }
+        }
+        
+        // Gerar imagem
+        async function generateImage(prompt) {
+            showTypingIndicator();
+            
+            try {
+                const response = await queryHuggingFaceAPI({
+                    inputs: prompt,
+                    model: DEFAULT_MODEL_IMAGE
+                });
+                
+                hideTypingIndicator();
+                
+                if (response) {
+                    // A API de imagem retorna dados binários, precisamos criar uma URL
+                    const blob = new Blob([response], { type: 'image/png' });
+                    const imageUrl = URL.createObjectURL(blob);
+                    
+                    addMessage(`Aqui está a imagem gerada para: "${prompt}"`, false, "normal", imageUrl);
+                } else {
+                    addMessage("Desculpe, não consegui gerar a imagem. Tente novamente.", false, "error");
+                }
+            } catch (error) {
+                hideTypingIndicator();
+                console.error("Erro ao gerar imagem:", error);
+                addMessage("Erro ao gerar imagem: " + error.message, false, "error");
+            }
+        }
+        
+        // Editar imagem (in-painting)
+        async function editImage(prompt, image) {
+            showTypingIndicator();
+            
+            try {
+                // Para in-painting, precisamos enviar a imagem e o prompt
+                const response = await queryHuggingFaceAPI({
+                    inputs: {
+                        image: await readFileAsBase64(image),
+                        prompt: prompt
+                    },
+                    model: DEFAULT_MODEL_IMAGE
+                });
+                
+                hideTypingIndicator();
+                
+                if (response) {
+                    const blob = new Blob([response], { type: 'image/png' });
+                    const imageUrl = URL.createObjectURL(blob);
+                    
+                    addMessage(`Aqui está a imagem editada: "${prompt}"`, false, "normal", imageUrl);
+                } else {
+                    addMessage("Desculpe, não consegui editar a imagem. Tente novamente.", false, "error");
+                }
+            } catch (error) {
+                hideTypingIndicator();
+                console.error("Erro ao editar imagem:", error);
+                addMessage("Erro ao editar imagem: " + error.message, false, "error");
+            }
+        }
+        
+        // Ler arquivo como Base64
+        function readFileAsBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result.split(',')[1]);
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+        }
+        
+        // Consultar API Hugging Face
+        async function queryHuggingFaceAPI(data) {
+            const model = data.model || DEFAULT_MODEL_TEXT;
+            const isImageModel = model.includes('stable-diffusion') || model.includes('dall-e');
+            
+            // Verificar se estamos usando proxy
+            let url, options;
+            
+            if (USE_PROXY) {
+                url = PROXY_URL;
+                options = {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        model: model,
+                        inputs: data.inputs,
+                        options: data.options
+                    })
+                };
+            } else {
+                // Usar API diretamente
+                if (!HF_API_KEY || HF_API_KEY === "YOUR_HF_API_KEY") {
+                    throw new Error("Chave da API não configurada");
+                }
+                
+                url = `https://api-inference.huggingface.co/models/${model}`;
+                options = {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${HF_API_KEY}`,
+                        'Content-Type': isImageModel ? 'application/octet-stream' : 'application/json',
+                    },
+                    body: isImageModel ? data.inputs : JSON.stringify({
+                        inputs: data.inputs,
+                        options: data.options || { wait_for_model: true }
+                    })
+                };
+            }
+            
+            console.log(`Fazendo requisição para: ${url}`, options);
+            
+            const response = await fetch(url, options);
+            
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`Erro na API: ${response.status} ${response.statusText} - ${errorText}`);
+            }
+            
+            if (isImageModel) {
+                return await response.blob();
+            } else {
+                return await response.json();
+            }
+        }
+        
+        // Resposta de fallback baseada em conhecimento local
+        function getFallbackResponse(message) {
+            const lowerMessage = message.toLowerCase();
+            
+            // Base de conhecimento local (mantida do código original)
+            const knowledgeBase = {
+                "cursos": {
+                    "administrativo": {
+                        "descricao": "Curso Administrativo com foco em desenvolvimento socioemocional, bem-estar, recursos tecnológicos, leitura e compreensão de textos, letramento matemático e educação financeira, entre outros.",
+                        "unidades": [
+                            "UC 01 - Desenvolvimento socioemocional - 60hs",
+                            "UC 02 - Bem-estar pessoal e social dos jovens - 20hs",
+                            "UC 03 - Recursos tecnológicos no contexto social e do trabalho - 24hs",
+                            "UC 04 - Leitura e compreensão de textos no contexto social e do trabalho - 28hs",
+                            "UC 05 - Letramento matemático e educação financeira - 28hs",
+                            "UC 06 - Laboratório Juventudes - 20hs",
+                            "UC 07 - Organizar e executar atividades de apoio aos processos da organização - 84hs",
+                            "UC 08 - Elaborar, organizar e controlar documentos da organização - 60hs",
+                            "UC 09 - Assistente administrativo - 16hs (PI)",
+                            "UC 10 - Compras e estoque - 32hs",
+                            "UC 11 - Administração de contas a pagar, contas a receber e tesouraria - 28hs"
+                        ]
+                    },
+                    "vendas": {
+                        "descricao": "Curso de Vendas com foco em desenvolvimento socioemocional, bem-estar, recursos tecnológicos, leitura e compreensão de textos, letramento matemático e educação financeira, além de técnicas específicas de vendas.",
+                        "unidades": [
+                            "UC 01 - Desenvolvimento socioemocional - 60hs",
+                            "UC 02 - Bem-estar pessoal e social dos jovens - 20hs",
+                            "UC 03 - Recursos tecnológicos no contexto social e do trabalho - 24hs",
+                            "UC 04 - Leitura e compreensão de textos no contexto social e do trabalho - 28hs",
+                            "UC 05 - Letramento matemático e educação financeira - 28hs",
+                            "UC 06 - Laboratório Juventudes - 20hs",
+                            "UC 07 - Organizar ações e planos de venda - 48hs",
+                            "UC 08 - Realizar a Venda - 60hs",
+                            "UC 09 - Realizar ações de pós-venda - 36hs",
+                            "UC 10 - PI Vendedor - 16hs (PI)",
+                            "UC 11 - Inteligência emocional e vendas - 15hs",
+                            "UC 12 - Marketing pessoal para vendedores: você é o seu melhor produto - 15hs",
+                            "UC 13 - Estratégias de negociação para vendedor - 15hs",
+                            "UC 14 - Design Thinking Aplicado a Vendas - 15hs"
+                        ]
+                    },
+                    "supermercado": {
+                        "descricao": "Curso de Supermercado com foco em desenvolvimento socioemocional, bem-estar, recursos tecnológicos, leitura e compreensão de textos, letramento matemático e educação financeira, além de técnicas específicas para o varejo.",
+                        "unidades": [
+                            "UC 01 - Desenvolvimento socioemocional - 60hs",
+                            "UC 02 - Bem-estar pessoal e social dos jovens - 20hs",
+                            "UC 03 - Recursos tecnológicos no contexto social e do trabalho - 24hs",
+                            "UC 04 - Leitura e compreensão de textos no contexto social e do trabalho - 28hs",
+                            "UC 05 - Letramento matemático e educação financeira - 28hs",
+                            "UC 06 - Laboratório Juventudes - 20hs",
+                            "UC 07 - Orientar clientes em relação às mercadorias, produtos e serviços - 48hs",
+                            "UC 08 - Abastecer o ponto de venda com mercadorias e produtos - 96hs",
+                            "UC 09 - PI Repositor de Mercadorias - 16hs (PI)",
+                            "UC 10 - A arte de se comunicar e de vender mais - 30hs",
+                            "UC 11 - Logística nas operações de varejo - 15hs",
+                            "UC 12 - Técnicas de prevenção de perdas no varejo, atacarejo e atacado - 15hs"
+                        ]
+                    }
+                }
+            };
+            
+            // Respostas baseadas no conteúdo do arquivo
+            if (lowerMessage.includes('curso') || lowerMessage.includes('cursos')) {
+                if (lowerMessage.includes('administrativo')) {
+                    return `Curso Administrativo: ${knowledgeBase.cursos.administrativo.descricao}\n\nUnidades Curriculares:\n${knowledgeBase.cursos.administrativo.unidades.join('\n')}`;
+                } else if (lowerMessage.includes('vendas')) {
+                    return `Curso de Vendas: ${knowledgeBase.cursos.vendas.descricao}\n\nUnidades Curriculares:\n${knowledgeBase.cursos.vendas.unidades.join('\n')}`;
+                } else if (lowerMessage.includes('supermercado')) {
+                    return `Curso de Supermercado: ${knowledgeBase.cursos.supermercado.descricao}\n\nUnidades Curriculares:\n${knowledgeBase.cursos.supermercado.unidades.join('\n')}`;
+                } else {
+                    return `Temos três cursos disponíveis:\n\n1. Curso Administrativo\n2. Curso de Vendas\n3. Curso de Supermercado\n\nSobre qual curso você gostaria de saber mais?`;
+                }
+            } else if (lowerMessage.includes('olá') || lowerMessage.includes('oi') || lowerMessage.includes('bom dia') || lowerMessage.includes('boa tarde') || lowerMessage.includes('boa noite')) {
+                return 'Olá! Como posso ajudá-lo com informações sobre os cursos do Senac?';
+            } else if (lowerMessage.includes('obrigado') || lowerMessage.includes('obrigada')) {
+                return 'De nada! Estou à disposição para mais informações.';
+            } else {
+                return 'Desculpe, não encontrei informações específicas sobre isso na base de dados. Posso ajudar com informações sobre os cursos administrativo, vendas e supermercado.';
+            }
+        }
+        
+        // Manipular upload de imagem
+        function handleImageUpload(event) {
+            const file = event.target.files[0];
+            if (file) {
+                uploadedImage = file;
+                
+                // Mostrar preview
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const img = document.createElement('img');
+                    img.src = e.target.result;
+                    img.classList.add('image-preview');
+                    imagePreview.innerHTML = '';
+                    imagePreview.appendChild(img);
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+        
+        // Salvar histórico de conversa
+        function saveConversationHistory() {
+            if (ENABLE_CACHE) {
+                localStorage.setItem(CACHE_KEY, JSON.stringify(conversationHistory));
+            }
+        }
+        
+        // Carregar histórico de conversa
+        function loadConversationHistory() {
+            if (ENABLE_CACHE) {
+                const saved = localStorage.getItem(CACHE_KEY);
+                if (saved) {
+                    try {
+                        conversationHistory = JSON.parse(saved);
+                        
+                        // Reconstruir mensagens na UI
+                        conversationHistory.forEach(msg => {
+                            addMessage(msg.text, msg.isUser, msg.type, msg.imageUrl);
+                        });
+                    } catch (e) {
+                        console.error("Erro ao carregar histórico:", e);
+                    }
+                }
+            }
+        }
+        
+        // Limpar histórico de conversa
+        function clearConversationHistory() {
+            conversationHistory = [];
+            messagesContainer.innerHTML = '';
+            localStorage.removeItem(CACHE_KEY);
+            
+            // Adicionar mensagem inicial
+            addMessage("Olá! Sou o assistente virtual do Senac com IA. Como posso ajudá-lo hoje?", false);
+        }
+        
+        // Inicializar a aplicação
+        loadTheme();
+        init();
+    </script>
+</body>
+</html>
