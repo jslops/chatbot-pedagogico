@@ -1,0 +1,6 @@
+{
+  "name": "Planejamento Pedagógico Inteligente",
+  "description": "Plataforma avançada de planejamento pedagógico com assistente IA integrado para elaboração de planos de aula, planos de curso, planos de trabalho e planos de ação alinhados com a BNCC e Senac.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
